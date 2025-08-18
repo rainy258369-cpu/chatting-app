@@ -1,49 +1,29 @@
 // src/components/Header.tsx
 //全局头部，显示app名称+当前用户+退出
-import { useNavigate } from "react-router-dom"
-import { useChatStore } from "../store/useChatStore"
+import { useNavigate } from 'react-router-dom'
+import { useChatStore } from '../store/useChatStore'
 
 export default function Header() {
-  const user = useChatStore((s) => s.user)
+  const currentUser = useChatStore((s) => s.currentUser)
   const logout = useChatStore((s) => s.logout)
   const navigate = useNavigate()
 
   const handleLogout = () => {
     logout()
-    navigate("/login")
+    navigate('/login')
   }
 
   return (
-    <header
-      style={{
-        height: 56,
-        padding: "0 16px",
-        borderBottom: "1px solid #e5e7eb",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        background: "#ffffffcc",
-        backdropFilter: "saturate(180%) blur(6px)",
-        position: "sticky",
-        top: 0,
-        zIndex: 10,
-      }}
-    >
-      <div style={{ fontWeight: 700 }}>Chatting • Demo</div>
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-        <span style={{ fontSize: 14, color: "#6b7280" }}>
-          {user ? `已登录：${user}` : "未登录"}
+    <header className="sticky top-0 z-10 h-14 px-4 border-b bg-white/90 backdrop-blur flex items-center justify-between">
+      <div className="font-bold">Chatting • Demo</div>
+      <div className="flex items-center gap-3">
+        <span className="text-sm text-gray-500">
+          {currentUser ? `已登录：${currentUser.username}` : '未登录'}
         </span>
-        {user && (
+        {currentUser && (
           <button
             onClick={handleLogout}
-            style={{
-              padding: "6px 10px",
-              borderRadius: 8,
-              border: "1px solid #e5e7eb",
-              background: "#fff",
-              cursor: "pointer",
-            }}
+            className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 transition"
           >
             退出
           </button>

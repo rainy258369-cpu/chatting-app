@@ -24,8 +24,8 @@ export default tseslint.config([
       prettier, // ✅ 新增
     },
     rules: {
-      // ✅ 相当于 .eslintrc.cjs 里的 "prettier"
-      'prettier/prettier': 'error',
+      // ✅ 相当于 .eslintrc.cjs 里的 "prettier"，并忽略 Windows 的换行符差异
+      'prettier/prettier': ['error', { endOfLine: 'auto' }],
 
       // ✅ React 17+ 不需要 import React
       'react/react-in-jsx-scope': 'off',

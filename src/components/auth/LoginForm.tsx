@@ -1,69 +1,105 @@
 // src/components/auth/LoginForm.tsx
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
-import { useChatStore } from "../../store/useChatStore"
+import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Box, TextField, Button, Typography, Paper, Avatar, IconButton, Alert } from '@mui/material'
+import { PhotoCamera, Person } from '@mui/icons-material'
+import { useChatStore } from '../../store/useChatStore'
 
 export default function LoginForm() {
-  const [username, setUsername] = useState("")
+  const [username, setUsername] = useState('')
+  const [avatar, setAvatar] = useState<string | null>(null)
+  const [error, setError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const login = useChatStore((s) => s.login)
   const navigate = useNavigate()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!username.trim()) return
-    login(username.trim())
-    navigate("/chat")
+    if (!username.trim()) {
+      setError('请输入用户名')
+      return
+    }
+    setError('')
+    try {
+      await login(username, avatar || undefined)
+      navigate('/chat', { replace: true })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '登录失败，请重试'
+      setError(message)
+    }
+  }
+
+  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setAvatar(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click()
   }
 
   return (
-    <div
-      style={{
-        minHeight: "calc(100vh - 56px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "#f3f4f6",
-        padding: 16,
-      }}
-    >
-      <form
-        onSubmit={handleSubmit}
-        style={{
-          width: 320,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
-          padding: 20,
-          borderRadius: 12,
-          border: "1px solid #e5e7eb",
-          background: "#fff",
-        }}
-      >
-        <h2 style={{ margin: 0, textAlign: "center" }}>登录聊天室</h2>
+    <Box className="flex items-center justify-center min-h-[calc(100vh-56px)] bg-gradient-to-br from-indigo-500 to-purple-600 px-4">
+      <Paper elevation={8} className="w-full max-w-sm text-center p-6 md:p-8">
+        <Typography variant="h4" component="h1" gutterBottom>
+          欢迎来到聊天室
+        </Typography>
+
+        <Box className="mb-4 flex justify-center">
+          <Box className="relative">
+            <Avatar
+              src={avatar || undefined}
+              sx={{ width: 80, height: 80, cursor: 'pointer', border: '3px solid #e0e0e0' }}
+              onClick={handleAvatarClick}
+            >
+              <Person sx={{ fontSize: 40 }} />
+            </Avatar>
+            <IconButton
+              className="absolute bottom-0 right-0 bg-indigo-600 text-white hover:bg-indigo-700"
+              onClick={handleAvatarClick}
+            >
+              <PhotoCamera />
+            </IconButton>
+          </Box>
+        </Box>
+
         <input
-          placeholder="请输入你的昵称"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-          style={{
-            padding: "10px 12px",
-            border: "1px solid #d1d5db",
-            borderRadius: 8,
-          }}
+          type="file"
+          ref={fileInputRef}
+          accept="image/*"
+          onChange={handleAvatarChange}
+          style={{ display: 'none' }}
         />
-        <button
-          type="submit"
-          style={{
-            padding: "10px 12px",
-            borderRadius: 8,
-            border: 0,
-            background: "#4f46e5",
-            color: "#fff",
-            cursor: "pointer",
-          }}
-        >
-          进入
-        </button>
-      </form>
-    </div>
+
+        <Box component="form" onSubmit={handleSubmit} className="mt-1">
+          {error && (
+            <Alert severity="error" className="mb-2">
+              {error}
+            </Alert>
+          )}
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            label="用户名"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            autoFocus
+            className="mb-2"
+          />
+
+          <Button type="submit" fullWidth variant="contained" size="large" className="mt-3 mb-2">
+            开始聊天
+          </Button>
+        </Box>
+      </Paper>
+    </Box>
   )
 }

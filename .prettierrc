@@ -1,4 +1,10 @@
 {
+  "singleQuote": true,
+  "semi": false,
+  "trailingComma": "all",
+  "endOfLine": "auto"
+}
+{
   "semi": false,
   "singleQuote": true,
   "trailingComma": "all",

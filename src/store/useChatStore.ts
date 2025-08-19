@@ -3,7 +3,7 @@
 import { create } from 'zustand'
 import { io, Socket } from 'socket.io-client'
 import type { User, Message, ChatSession, FriendRequest } from '../types'
-import { apiLogin } from '../services/api'
+import { apiLogin, apiGetFriends, apiGetFriendRequests, apiGetConversation } from '../services/api'
 
 interface ChatState {
   // 用户状态
@@ -42,6 +42,10 @@ interface ChatState {
   // WebSocket操作
   connectSocket: () => void
   disconnectSocket: () => void
+
+  // 数据加载
+  loadInitialData: () => Promise<void>
+  loadConversation: (otherUserId: string) => Promise<void>
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -67,6 +71,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
     set({ currentUser: user, isAuthenticated: true })
     get().connectSocket()
+    // 加载好友和待处理请求
+    await get().loadInitialData()
   },
 
   logout: () => {
@@ -137,12 +143,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
 
     // 添加到本地消息列表
-    set((state) => ({
-      messages: {
-        ...state.messages,
-        [receiverId]: [...(state.messages[receiverId] || []), message],
-      },
-    }))
+    set((state) => {
+      const existing = state.messages[receiverId] || []
+      const merged = [...existing, message]
+      const uniqueById = Array.from(new Map(merged.map((m) => [m.id, m])).values())
+      return {
+        messages: {
+          ...state.messages,
+          [receiverId]: uniqueById,
+        },
+      }
+    })
 
     // 发送到服务器
     socket.emit('message:send', message)
@@ -190,12 +201,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     })
 
     socket.on('message:receive', (message: Message) => {
-      set((state) => ({
-        messages: {
-          ...state.messages,
-          [message.senderId]: [...(state.messages[message.senderId] || []), message],
-        },
-      }))
+      set((state) => {
+        const existing = state.messages[message.senderId] || []
+        const merged = [...existing, message]
+        const uniqueById = Array.from(new Map(merged.map((m) => [m.id, m])).values())
+        return {
+          messages: {
+            ...state.messages,
+            [message.senderId]: uniqueById,
+          },
+        }
+      })
     })
 
     socket.on('friend:request', (request: FriendRequest) => {
@@ -231,5 +247,38 @@ export const useChatStore = create<ChatState>((set, get) => ({
       socket.disconnect()
       set({ socket: null, isConnected: false })
     }
+  },
+
+  // 数据加载
+  loadInitialData: async () => {
+    const { currentUser } = get()
+    if (!currentUser) return
+    const [friends, requests] = await Promise.all([
+      apiGetFriends(currentUser.id),
+      apiGetFriendRequests(currentUser.id),
+    ])
+    set({ friends, friendRequests: requests })
+  },
+
+  loadConversation: async (otherUserId: string) => {
+    const { currentUser } = get()
+    if (!currentUser) return
+    const list: Message[] = await apiGetConversation(currentUser.id, otherUserId)
+    // 将 timestamp 转换为 Date
+    const normalized = list.map((m) => ({
+      ...m,
+      timestamp: new Date(m.timestamp as unknown as string),
+    }))
+    set((state) => {
+      const existing = state.messages[otherUserId] || []
+      const merged = [...existing, ...normalized]
+      const uniqueById = Array.from(new Map(merged.map((m) => [m.id, m])).values())
+      return {
+        messages: {
+          ...state.messages,
+          [otherUserId]: uniqueById,
+        },
+      }
+    })
   },
 }))

@@ -23,10 +23,8 @@ function findUserById(userId) {
   return db.getUserById(userId);
 }
 
-// 存储在线用户
+// 存储在线用户（仅在线态，好友/消息改由 SQLite 持久化）
 const onlineUsers = new Map();
-const friendRequests = new Map();
-const messages = new Map();
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
@@ -66,68 +64,85 @@ io.on('connection', (socket) => {
     console.log('User logged in (event):', user.username);
   });
 
-  // 发送消息
+  // 发送消息（持久化）
   socket.on('message:send', (message) => {
     const sender = onlineUsers.get(message.senderId);
     const receiver = onlineUsers.get(message.receiverId);
-    
-    if (sender && receiver) {
-      // 存储消息
-      if (!messages.has(message.receiverId)) {
-        messages.set(message.receiverId, []);
-      }
-      messages.get(message.receiverId).push(message);
-      try { db.saveMessage(message); } catch (e) { console.error('saveMessage error', e); }
-      
-      // 发送给接收者
+
+    // 无论对方是否在线，都保存消息
+    try { db.saveMessage(message); } catch (e) { console.error('saveMessage error', e); }
+
+    if (receiver) {
       io.to(receiver.socketId).emit('message:receive', message);
-      
-      // 发送确认给发送者
-      socket.emit('message:sent', message);
     }
+    // 发送确认给发送者（如果还在线）
+    if (sender) socket.emit('message:sent', message);
   });
 
-  // 好友请求
+  // 好友请求（持久化）
   socket.on('friend:request', (data) => {
     const inferredFrom = data.fromUserId || socket.userId;
-    const fromUser = onlineUsers.get(inferredFrom);
-    const toUser = onlineUsers.get(data.friendId);
-    
-    if (fromUser && toUser) {
-      const request = {
-        id: `req_${Date.now()}`,
-        fromUser,
-        toUser,
-        status: 'pending',
-        timestamp: new Date()
-      };
-      
-      friendRequests.set(request.id, request);
-      
-      // 发送好友请求给目标用户
-      io.to(toUser.socketId).emit('friend:request', request);
+    const fromUserOnline = onlineUsers.get(inferredFrom);
+    const toUserOnline = onlineUsers.get(data.friendId);
+    if (!inferredFrom || !data.friendId) return;
+
+    const fromUser = db.getUserById(inferredFrom);
+    const toUser = db.getUserById(data.friendId);
+    if (!fromUser || !toUser) return;
+
+    const request = {
+      id: `req_${Date.now()}`,
+      fromUserId: fromUser.id,
+      toUserId: toUser.id,
+      status: 'pending',
+      timestamp: Date.now(),
+    };
+    try { db.saveFriendRequest(request); } catch (e) { console.error('saveFriendRequest error', e); }
+
+    const requestPayload = {
+      id: request.id,
+      fromUser: { ...fromUser, status: onlineUsers.has(fromUser.id) ? 'online' : 'offline' },
+      toUser: { ...toUser, status: onlineUsers.has(toUser.id) ? 'online' : 'offline' },
+      status: request.status,
+      timestamp: new Date(request.timestamp),
+    };
+
+    if (toUserOnline) {
+      io.to(toUserOnline.socketId).emit('friend:request', requestPayload);
     }
   });
 
-  // 好友请求响应
+  // 好友请求响应（持久化 + 建立好友关系）
   socket.on('friend:response', (data) => {
-    const request = friendRequests.get(data.requestId);
-    if (request) {
-      request.status = data.status;
-      
-      // 通知请求发送者
-      const fromUser = onlineUsers.get(request.fromUser.id);
-      if (fromUser) {
-        io.to(fromUser.socketId).emit('friend:response', request);
+    const { requestId, status } = data || {};
+    if (!requestId || !status) return;
+    try {
+      db.updateFriendRequestStatus(requestId, status);
+    } catch (e) {
+      console.error('updateFriendRequestStatus error', e);
+    }
+
+    // 查询请求信息，通知两端；若接受则写入双向好友关系
+    try {
+      const req = db.getFriendRequestByIdWithUsers(requestId);
+      if (!req) return;
+      const fromUserOnline = onlineUsers.get(req.fromUser.id);
+      const toUserOnline = onlineUsers.get(req.toUser.id);
+
+      if (status === 'accepted') {
+        try { db.addBidirectionalFriendship(req.fromUser.id, req.toUser.id); } catch (e) { console.error('addFriendship error', e); }
       }
-      
-      // 通知请求接收者
-      const toUser = onlineUsers.get(request.toUser.id);
-      if (toUser) {
-        io.to(toUser.socketId).emit('friend:response', request);
-      }
-      
-      friendRequests.delete(data.requestId);
+
+      const payload = {
+        ...req,
+        status,
+        fromUser: { ...req.fromUser, status: onlineUsers.has(req.fromUser.id) ? 'online' : 'offline' },
+        toUser: { ...req.toUser, status: onlineUsers.has(req.toUser.id) ? 'online' : 'offline' },
+      };
+      if (fromUserOnline) io.to(fromUserOnline.socketId).emit('friend:response', payload);
+      if (toUserOnline) io.to(toUserOnline.socketId).emit('friend:response', payload);
+    } catch (e) {
+      console.error('friend accept handle error', e);
     }
   });
 
@@ -212,10 +227,38 @@ app.get('/api/debug/users', (req, res) => {
   }
 });
 
+// 查询单用户收件箱（保留，便于离线消息拉取）
 app.get('/api/messages/:userId', (req, res) => {
   const persisted = db.getMessagesForUser(req.params.userId);
-  const inMemory = messages.get(req.params.userId) || [];
-  res.json([...persisted, ...inMemory]);
+  res.json(persisted);
+});
+
+// 查询双方会话历史
+app.get('/api/conversations/:userIdA/:userIdB', (req, res) => {
+  const { userIdA, userIdB } = req.params;
+  const rows = db.getMessagesForConversation(userIdA, userIdB);
+  res.json(rows);
+});
+
+// 查询好友列表
+app.get('/api/friends/:userId', (req, res) => {
+  const { userId } = req.params;
+  const rows = db.getFriendsForUser(userId).map(u => ({
+    ...u,
+    status: onlineUsers.has(u.id) ? 'online' : 'offline'
+  }));
+  res.json(rows);
+});
+
+// 查询待处理好友请求
+app.get('/api/friend-requests/:userId', (req, res) => {
+  const { userId } = req.params;
+  try {
+    const rows = db.getPendingFriendRequestsForUser(userId);
+    res.json(rows);
+  } catch (e) {
+    res.status(500).json({ message: 'failed', error: String(e) })
+  }
 });
 
 const PORT = process.env.PORT || 3001;

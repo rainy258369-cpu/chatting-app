@@ -120,6 +120,103 @@ function getMessagesForUser(userId) {
   }))
 }
 
+function getMessagesForConversation(userIdA, userIdB) {
+  const stmt = db.prepare(
+    `SELECT id, senderId, receiverId, content, type, timestamp, isRead
+     FROM messages
+     WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)
+     ORDER BY timestamp ASC`
+  )
+  const rows = stmt.all(userIdA, userIdB, userIdB, userIdA)
+  return rows.map((r) => ({
+    id: r.id,
+    senderId: r.senderId,
+    receiverId: r.receiverId,
+    content: r.content,
+    type: r.type,
+    timestamp: new Date(r.timestamp),
+    isRead: !!r.isRead,
+  }))
+}
+
+function saveFriendRequest(request) {
+  const stmt = db.prepare(
+    'INSERT OR REPLACE INTO friend_requests (id, fromUserId, toUserId, status, timestamp) VALUES (?, ?, ?, ?, ?)',
+  )
+  const ts = typeof request.timestamp === 'number' ? request.timestamp : new Date(request.timestamp).getTime()
+  stmt.run(request.id, request.fromUserId, request.toUserId, request.status, ts)
+}
+
+function updateFriendRequestStatus(id, status) {
+  const stmt = db.prepare('UPDATE friend_requests SET status = ? WHERE id = ?')
+  stmt.run(status, id)
+}
+
+function addFriendship(userId, friendId) {
+  const stmt = db.prepare('INSERT OR IGNORE INTO friends (userId, friendId) VALUES (?, ?)')
+  stmt.run(userId, friendId)
+}
+
+function addBidirectionalFriendship(userId, friendId) {
+  const insert = db.prepare('INSERT OR IGNORE INTO friends (userId, friendId) VALUES (?, ?)')
+  const tx = db.transaction((a, b) => {
+    insert.run(a, b)
+    insert.run(b, a)
+  })
+  tx(userId, friendId)
+}
+
+function getFriendsForUser(userId) {
+  const stmt = db.prepare(
+    `SELECT u.id, u.username, u.avatar
+     FROM friends f
+     JOIN users u ON u.id = f.friendId
+     WHERE f.userId = ?`
+  )
+  return stmt.all(userId)
+}
+
+function getPendingFriendRequestsForUser(userId) {
+  const stmt = db.prepare(
+    `SELECT fr.id, fr.fromUserId, fr.toUserId, fr.status, fr.timestamp,
+            fu.username AS fromUsername, fu.avatar AS fromAvatar,
+            tu.username AS toUsername, tu.avatar AS toAvatar
+     FROM friend_requests fr
+     JOIN users fu ON fu.id = fr.fromUserId
+     JOIN users tu ON tu.id = fr.toUserId
+     WHERE fr.toUserId = ? AND fr.status = 'pending'
+     ORDER BY fr.timestamp DESC`
+  )
+  return stmt.all(userId).map((r) => ({
+    id: r.id,
+    fromUser: { id: r.fromUserId, username: r.fromUsername, avatar: r.fromAvatar },
+    toUser: { id: r.toUserId, username: r.toUsername, avatar: r.toAvatar },
+    status: r.status,
+    timestamp: new Date(r.timestamp),
+  }))
+}
+
+function getFriendRequestByIdWithUsers(id) {
+  const stmt = db.prepare(
+    `SELECT fr.id, fr.fromUserId, fr.toUserId, fr.status, fr.timestamp,
+            fu.username AS fromUsername, fu.avatar AS fromAvatar,
+            tu.username AS toUsername, tu.avatar AS toAvatar
+     FROM friend_requests fr
+     JOIN users fu ON fu.id = fr.fromUserId
+     JOIN users tu ON tu.id = fr.toUserId
+     WHERE fr.id = ?`
+  )
+  const r = stmt.get(id)
+  if (!r) return null
+  return {
+    id: r.id,
+    fromUser: { id: r.fromUserId, username: r.fromUsername, avatar: r.fromAvatar },
+    toUser: { id: r.toUserId, username: r.toUsername, avatar: r.toAvatar },
+    status: r.status,
+    timestamp: new Date(r.timestamp),
+  }
+}
+
 module.exports = {
   getUserById,
   getUserByUsername,
@@ -127,6 +224,14 @@ module.exports = {
   searchUsers,
   saveMessage,
   getMessagesForUser,
+  getMessagesForConversation,
+  saveFriendRequest,
+  updateFriendRequestStatus,
+  addFriendship,
+  addBidirectionalFriendship,
+  getFriendsForUser,
+  getPendingFriendRequestsForUser,
+  getFriendRequestByIdWithUsers,
   getAllUsers: () => db.prepare('SELECT id, username, avatar FROM users').all(),
 }
 

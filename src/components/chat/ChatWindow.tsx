@@ -27,6 +27,21 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ friend }) => {
     scrollToBottom()
   }, [chatMessages])
 
+  // 首次打开该好友会话时从后端加载历史消息
+  useEffect(() => {
+    const load = async () => {
+      try {
+        await useChatStore.getState().loadConversation(friend.id)
+      } catch (e) {
+        // 忽略错误显示，控制台打印即可
+        console.warn('加载历史消息失败', e)
+      }
+    }
+    load()
+    // 仅在 friend.id 变化时触发
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [friend.id])
+
   const handleSend = () => {
     if (!messageText.trim() || !isConnected) return
 

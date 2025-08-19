@@ -24,9 +24,8 @@ interface ChatState {
   isConnected: boolean
 
   // 操作函数
-  login: (username: string, avatar?: string) => Promise<void>
+  login: (username: string, password: string) => Promise<void> // 移除 avatar
   logout: () => void
-  updateAvatar: (avatar: string) => void
 
   // 好友操作
   addFriend: (friendId: string) => void
@@ -46,6 +45,7 @@ interface ChatState {
   // 数据加载
   loadInitialData: () => Promise<void>
   loadConversation: (otherUserId: string) => Promise<void>
+  clearMessages: () => void
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -61,12 +61,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isConnected: false,
 
   // 用户认证
-  login: async (username: string, avatar?: string) => {
-    const res = await apiLogin(username, avatar)
+  login: async (username: string, password: string) => {
+    const res = await apiLogin(username, password)
     const user: User = {
       id: res.id,
       username: res.username,
-      avatar: res.avatar,
+      avatar: '', // 或者直接不传avatar字段，视User类型定义而定
       status: 'online',
     }
     set({ currentUser: user, isAuthenticated: true })
@@ -86,14 +86,6 @@ export const useChatStore = create<ChatState>((set, get) => ({
       currentChatId: null,
       messages: {},
     })
-  },
-
-  updateAvatar: (avatar: string) => {
-    const { currentUser } = get()
-    if (currentUser) {
-      const updatedUser = { ...currentUser, avatar }
-      set({ currentUser: updatedUser })
-    }
   },
 
   // 好友操作
@@ -280,5 +272,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
         },
       }
     })
+  },
+
+  clearMessages: () => {
+    set({ messages: {} })
   },
 }))

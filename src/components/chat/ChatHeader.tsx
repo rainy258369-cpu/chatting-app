@@ -3,7 +3,7 @@
 import { useChatStore } from '../../store/useChatStore'
 
 export default function ChatHeader({ title = '公共聊天室' }: { title?: string }) {
-  const user = useChatStore((s) => s.user)
+  const currentUser = useChatStore((s) => s.currentUser)
   const clearMessages = useChatStore((s) => s.clearMessages)
 
   return (
@@ -19,7 +19,9 @@ export default function ChatHeader({ title = '公共聊天室' }: { title?: stri
     >
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <strong style={{ fontSize: 16 }}>{title}</strong>
-        <span style={{ fontSize: 12, color: '#6b7280' }}>你是：{user || '未登录'}</span>
+        <span style={{ fontSize: 12, color: '#6b7280' }}>
+          你是：{currentUser?.username || '未登录'}
+        </span>
       </div>
       <button
         onClick={clearMessages}

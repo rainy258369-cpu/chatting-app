@@ -1,6 +1,7 @@
 const path = require('path')
 const fs = require('fs')
 const Database = require('better-sqlite3')
+const bcrypt = require('bcryptjs')
 
 const dataDir = path.join(__dirname, 'data')
 const dbFile = path.join(dataDir, 'chatting.db')
@@ -17,7 +18,8 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,
-    avatar TEXT DEFAULT ''
+    avatar TEXT DEFAULT '',
+    password TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS messages (
@@ -55,24 +57,29 @@ function getUserByUsername(username) {
   return stmt.get(username) || null
 }
 
-function createUser(id, username, avatar) {
-  const stmt = db.prepare('INSERT INTO users (id, username, avatar) VALUES (?, ?, ?)')
-  stmt.run(id, username, avatar || '')
+function createUser(id, username, avatar, passwordHash) {
+  const stmt = db.prepare('INSERT INTO users (id, username, avatar, password) VALUES (?, ?, ?, ?)')
+  stmt.run(id, username, avatar || '', passwordHash)
   return { id, username, avatar: avatar || '' }
 }
 
-function upsertUser(username, avatar) {
-  const existing = getUserByUsername(username)
-  if (!existing) {
+function loginOrRegister(username, password, avatar) {
+  const row = db.prepare('SELECT id, username, avatar, password FROM users WHERE username = ? COLLATE NOCASE').get(username)
+  if (!row) {
     const id = `user_${Date.now()}`
-    return createUser(id, username, avatar)
+    const hash = bcrypt.hashSync(String(password), 10)
+    return createUser(id, username, avatar, hash)
   }
-  if (avatar && avatar !== existing.avatar) {
+  const ok = bcrypt.compareSync(String(password), row.password)
+  if (!ok) {
+    throw new Error('用户名或密码不正确')
+  }
+  if (avatar && avatar !== row.avatar) {
     const upd = db.prepare('UPDATE users SET avatar = ? WHERE id = ?')
-    upd.run(avatar, existing.id)
-    return { ...existing, avatar }
+    upd.run(avatar, row.id)
+    return { id: row.id, username: row.username, avatar }
   }
-  return existing
+  return { id: row.id, username: row.username, avatar: row.avatar }
 }
 
 function searchUsers(query, excludeId) {
@@ -220,7 +227,7 @@ function getFriendRequestByIdWithUsers(id) {
 module.exports = {
   getUserById,
   getUserByUsername,
-  upsertUser,
+  loginOrRegister,
   searchUsers,
   saveMessage,
   getMessagesForUser,

@@ -1,15 +1,13 @@
 // src/components/auth/LoginForm.tsx
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Box, TextField, Button, Typography, Paper, Avatar, IconButton, Alert } from '@mui/material'
-import { PhotoCamera, Person } from '@mui/icons-material'
+import { Box, TextField, Button, Typography, Paper, Alert } from '@mui/material'
 import { useChatStore } from '../../store/useChatStore'
 
 export default function LoginForm() {
   const [username, setUsername] = useState('')
-  const [avatar, setAvatar] = useState<string | null>(null)
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const login = useChatStore((s) => s.login)
   const navigate = useNavigate()
 
@@ -19,29 +17,18 @@ export default function LoginForm() {
       setError('请输入用户名')
       return
     }
+    if (!password.trim()) {
+      setError('请输入密码')
+      return
+    }
     setError('')
     try {
-      await login(username, avatar || undefined)
+      await login(username, password)
       navigate('/chat', { replace: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : '登录失败，请重试'
       setError(message)
     }
-  }
-
-  const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setAvatar(e.target?.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click()
   }
 
   return (
@@ -50,32 +37,6 @@ export default function LoginForm() {
         <Typography variant="h4" component="h1" gutterBottom>
           欢迎来到聊天室
         </Typography>
-
-        <Box className="mb-4 flex justify-center">
-          <Box className="relative">
-            <Avatar
-              src={avatar || undefined}
-              sx={{ width: 80, height: 80, cursor: 'pointer', border: '3px solid #e0e0e0' }}
-              onClick={handleAvatarClick}
-            >
-              <Person sx={{ fontSize: 40 }} />
-            </Avatar>
-            <IconButton
-              className="absolute bottom-0 right-0 bg-indigo-600 text-white hover:bg-indigo-700"
-              onClick={handleAvatarClick}
-            >
-              <PhotoCamera />
-            </IconButton>
-          </Box>
-        </Box>
-
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept="image/*"
-          onChange={handleAvatarChange}
-          style={{ display: 'none' }}
-        />
 
         <Box component="form" onSubmit={handleSubmit} className="mt-1">
           {error && (
@@ -92,6 +53,17 @@ export default function LoginForm() {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoFocus
+            className="mb-2"
+          />
+
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            label="密码"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             className="mb-2"
           />
 

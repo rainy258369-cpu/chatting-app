@@ -3,15 +3,14 @@ const BASE_URL = import.meta.env?.VITE_API_BASE_URL || 'http://localhost:3001'
 export interface LoginResponse {
   id: string
   username: string
-  avatar?: string
   status: 'online' | 'offline'
 }
 
-export async function apiLogin(username: string, avatar?: string): Promise<LoginResponse> {
+export async function apiLogin(username: string, password: string): Promise<LoginResponse> {
   const res = await fetch(`${BASE_URL}/api/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, avatar }),
+    body: JSON.stringify({ username, password }),
   })
   if (!res.ok) {
     const text = await res.text()

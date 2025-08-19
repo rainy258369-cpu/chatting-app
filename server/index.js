@@ -176,17 +176,24 @@ io.on('connection', (socket) => {
 });
 
 // API路由
-// 登录（若不存在则创建），为简单起见不设密码（持久化 SQLite）
+// 登录（登陆即注册）：需要用户名+密码；不存在则创建，存在需校验密码
 app.post('/api/login', (req, res) => {
-  const { username, avatar } = req.body || {};
+  const { username, password, avatar } = req.body || {};
   if (!username || !String(username).trim()) {
     return res.status(400).json({ message: '用户名必填' });
   }
+  if (!password || !String(password).trim()) {
+    return res.status(400).json({ message: '密码必填' });
+  }
   const trimmed = String(username).trim();
-  const user = db.upsertUser(trimmed, avatar);
-  console.log('[api/login] upsert', trimmed, '=>', user.id);
-  const isOnline = onlineUsers.has(user.id);
-  res.json({ ...user, status: isOnline ? 'online' : 'offline' });
+  try {
+    const user = db.loginOrRegister(trimmed, String(password), avatar);
+    console.log('[api/login] loginOrRegister', trimmed, '=>', user.id);
+    const isOnline = onlineUsers.has(user.id);
+    res.json({ ...user, status: isOnline ? 'online' : 'offline' });
+  } catch (e) {
+    res.status(401).json({ message: e.message || '用户名或密码不正确' })
+  }
 });
 
 // 搜索用户（从数据库中），支持 query 与 excludeId

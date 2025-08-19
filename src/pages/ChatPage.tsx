@@ -2,13 +2,11 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Box,
-  Grid,
   Paper,
   Typography,
   Drawer,
   IconButton,
   Badge,
-  Avatar,
   Chip,
 } from '@mui/material'
 import { People, Chat, Menu, Close, Circle } from '@mui/icons-material'

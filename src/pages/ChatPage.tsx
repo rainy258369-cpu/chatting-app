@@ -21,8 +21,6 @@ export default function ChatPage() {
   const [selectedFriend, setSelectedFriend] = useState<User | null>(null)
 
   const isAuthenticated = useChatStore((s) => s.isAuthenticated)
-  const currentUser = useChatStore((s) => s.currentUser)
-  const friends = useChatStore((s) => s.friends)
   const friendRequests = useChatStore((s) => s.friendRequests)
   const isConnected = useChatStore((s) => s.isConnected)
   const navigate = useNavigate()

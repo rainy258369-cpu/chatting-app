@@ -9,7 +9,7 @@ const app = express();
 // ✅ 本地 + 部署前端的跨域白名单
 const allowedOrigins = [
   "http://localhost:5173",               // 本地调试
-  "https://your-frontend.onrender.com"   // 我的前端部署地址
+  "https://chatting-app-1-e742.onrender.com"   // 我的前端部署地址
 ];
 
 app.use(cors({

@@ -174,7 +174,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { currentUser } = get()
     if (!currentUser) return
 
-    const socket = io('http://localhost:3001', {
+    const socket = io('https://chatting-app-cy6c.onrender.com', {
       auth: {
         userId: currentUser.id,
         username: currentUser.username,

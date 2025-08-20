@@ -4,16 +4,18 @@ import { useChatStore } from '../../store/useChatStore'
 
 export default function MessageList() {
   const messages = useChatStore((s) => s.messages)
-  const user = useChatStore((s) => s.user)
+  const currentUser = useChatStore((s) => s.currentUser)
 
-  const items = useMemo(
+  const allMessages = useMemo(
     () =>
-      messages.map((m) => ({
-        ...m,
-        isMe: m.user === user,
-        time: new Date(m.ts).toLocaleTimeString(),
-      })),
-    [messages, user],
+      Object.values(messages)
+        .flat()
+        .map((m) => ({
+          ...m,
+          isMe: m.senderId === currentUser?.id,
+          time: new Date(m.timestamp).toLocaleTimeString(),
+        })),
+    [messages, currentUser],
   )
 
   return (
@@ -28,7 +30,7 @@ export default function MessageList() {
         gap: 8,
       }}
     >
-      {items.map((m) => (
+      {allMessages.map((m) => (
         <div
           key={m.id}
           style={{
@@ -49,8 +51,8 @@ export default function MessageList() {
             }}
             title={m.time}
           >
-            {!m.isMe && <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>{m.user}</div>}
-            {m.text}
+            {!m.isMe && <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>{m.senderId}</div>}
+            {m.content}
           </div>
         </div>
       ))}

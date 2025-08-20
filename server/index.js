@@ -245,6 +245,18 @@ app.get('/api/conversations/:userIdA/:userIdB', async (req, res) => {
   res.json(rows);
 });
 
+// 好友请求列表
+app.get('/api/friend-requests/:userId', async (req, res) => {
+  try {
+    const requests = await db.getFriendRequestsForUser(req.params.userId);
+    res.json(requests);
+  } catch (e) {
+    console.error('getFriendRequests error', e);
+    res.status(500).json({ message: '获取好友请求失败', error: String(e) });
+  }
+});
+
+
 // 好友列表
 app.get('/api/friends/:userId', async (req, res) => {
   const rows = await db.getFriendsForUser(req.params.userId);

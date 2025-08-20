@@ -159,6 +159,32 @@ async function getMessagesForConversation(userIdA, userIdB) {
 }
 
 // 好友请求
+
+// 获取某个用户收到的好友请求（含请求发起人信息）
+async function getFriendRequestsForUser(userId) {
+  const res = await pool.query(
+    `SELECT fr.id, fr.fromUserId, fr.toUserId, fr.status, fr.timestamp,
+            u.id as from_id, u.username as from_username, u.avatar as from_avatar
+     FROM friend_requests fr
+     JOIN users u ON u.id = fr.fromUserId
+     WHERE fr.toUserId=$1
+     ORDER BY fr.timestamp DESC`,
+    [userId]
+  );
+  return res.rows.map(r => ({
+    id: r.id,
+    status: r.status,
+    timestamp: new Date(Number(r.timestamp)),
+    fromUser: {
+      id: r.from_id,
+      username: r.from_username,
+      avatar: r.from_avatar
+    },
+    toUserId: r.touserid
+  }));
+}
+
+
 async function saveFriendRequest(req) {
   await pool.query(
     `INSERT INTO friend_requests (id, fromUserId, toUserId, status, timestamp)
@@ -224,4 +250,5 @@ module.exports = {
   addBidirectionalFriendship,
   getFriendsForUser,
   getAllUsers,
+  getFriendRequestsForUser 
 };

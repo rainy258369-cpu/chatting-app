@@ -1,227 +1,216 @@
-const path = require('path')
-const fs = require('fs')
-const Database = require('better-sqlite3')
-const bcrypt = require('bcryptjs')
+// db.js - PostgreSQL 版本
+const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
 
-const dataDir = path.join(__dirname, 'data')
-const dbFile = path.join(dataDir, 'chatting.db')
+const pool = new Pool({
+  user: process.env.PGUSER,
+  host: process.env.PGHOST,
+  database: process.env.PGDATABASE,
+  password: process.env.PGPASSWORD,
+  port: process.env.PGPORT,
+});
 
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true })
+// 初始化表
+async function init() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      avatar TEXT DEFAULT '',
+      password TEXT NOT NULL
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS messages (
+      id TEXT PRIMARY KEY,
+      senderId TEXT NOT NULL,
+      receiverId TEXT NOT NULL,
+      content TEXT NOT NULL,
+      type TEXT NOT NULL,
+      timestamp BIGINT NOT NULL,
+      isRead BOOLEAN DEFAULT FALSE
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS friend_requests (
+      id TEXT PRIMARY KEY,
+      fromUserId TEXT NOT NULL,
+      toUserId TEXT NOT NULL,
+      status TEXT NOT NULL,
+      timestamp BIGINT NOT NULL
+    );
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS friends (
+      userId TEXT NOT NULL,
+      friendId TEXT NOT NULL,
+      PRIMARY KEY (userId, friendId)
+    );
+  `);
+}
+init().catch(console.error);
+
+// 用户操作
+async function getUserById(id) {
+  const res = await pool.query(
+    'SELECT id, username, avatar FROM users WHERE id=$1',
+    [id]
+  );
+  return res.rows[0] || null;
 }
 
-const db = new Database(dbFile)
-db.pragma('journal_mode = WAL')
-db.pragma('synchronous = NORMAL')
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    username TEXT NOT NULL UNIQUE,
-    avatar TEXT DEFAULT '',
-    password TEXT NOT NULL
+async function getUserByUsername(username) {
+  const res = await pool.query(
+    'SELECT id, username, avatar FROM users WHERE username ILIKE $1',
+    [username]
   );
-
-  CREATE TABLE IF NOT EXISTS messages (
-    id TEXT PRIMARY KEY,
-    senderId TEXT NOT NULL,
-    receiverId TEXT NOT NULL,
-    content TEXT NOT NULL,
-    type TEXT NOT NULL,
-    timestamp INTEGER NOT NULL,
-    isRead INTEGER NOT NULL DEFAULT 0
-  );
-
-  CREATE TABLE IF NOT EXISTS friend_requests (
-    id TEXT PRIMARY KEY,
-    fromUserId TEXT NOT NULL,
-    toUserId TEXT NOT NULL,
-    status TEXT NOT NULL,
-    timestamp INTEGER NOT NULL
-  );
-
-  CREATE TABLE IF NOT EXISTS friends (
-    userId TEXT NOT NULL,
-    friendId TEXT NOT NULL,
-    PRIMARY KEY (userId, friendId)
-  );
-`)
-
-function getUserById(id) {
-  const stmt = db.prepare('SELECT id, username, avatar FROM users WHERE id = ?')
-  return stmt.get(id) || null
+  return res.rows[0] || null;
 }
 
-function getUserByUsername(username) {
-  const stmt = db.prepare('SELECT id, username, avatar FROM users WHERE username = ? COLLATE NOCASE')
-  return stmt.get(username) || null
+async function createUser(id, username, avatar, passwordHash) {
+  await pool.query(
+    'INSERT INTO users (id, username, avatar, password) VALUES ($1, $2, $3, $4)',
+    [id, username, avatar || '', passwordHash]
+  );
+  return { id, username, avatar: avatar || '' };
 }
 
-function createUser(id, username, avatar, passwordHash) {
-  const stmt = db.prepare('INSERT INTO users (id, username, avatar, password) VALUES (?, ?, ?, ?)')
-  stmt.run(id, username, avatar || '', passwordHash)
-  return { id, username, avatar: avatar || '' }
-}
-
-function loginOrRegister(username, password, avatar) {
-  const row = db.prepare('SELECT id, username, avatar, password FROM users WHERE username = ? COLLATE NOCASE').get(username)
+async function loginOrRegister(username, password, avatar) {
+  const res = await pool.query(
+    'SELECT id, username, avatar, password FROM users WHERE username ILIKE $1',
+    [username]
+  );
+  const row = res.rows[0];
   if (!row) {
-    const id = `user_${Date.now()}`
-    const hash = bcrypt.hashSync(String(password), 10)
-    return createUser(id, username, avatar, hash)
+    const id = `user_${Date.now()}`;
+    const hash = bcrypt.hashSync(String(password), 10);
+    return await createUser(id, username, avatar, hash);
   }
-  const ok = bcrypt.compareSync(String(password), row.password)
-  if (!ok) {
-    throw new Error('用户名或密码不正确')
-  }
+  const ok = bcrypt.compareSync(String(password), row.password);
+  if (!ok) throw new Error('用户名或密码不正确');
+
   if (avatar && avatar !== row.avatar) {
-    const upd = db.prepare('UPDATE users SET avatar = ? WHERE id = ?')
-    upd.run(avatar, row.id)
-    return { id: row.id, username: row.username, avatar }
+    await pool.query('UPDATE users SET avatar=$1 WHERE id=$2', [avatar, row.id]);
+    return { id: row.id, username: row.username, avatar };
   }
-  return { id: row.id, username: row.username, avatar: row.avatar }
+  return { id: row.id, username: row.username, avatar: row.avatar };
 }
 
-function searchUsers(query, excludeId) {
-  const like = `%${String(query || '').trim()}%`
-  if (String(query || '').trim()) {
-    const stmt = db.prepare(
-      'SELECT id, username, avatar FROM users WHERE username LIKE ? COLLATE NOCASE AND (? IS NULL OR id <> ?)' ,
-    )
-    return stmt.all(like, excludeId || null, excludeId || null)
+// 搜索用户
+async function searchUsers(query, excludeId) {
+  if (query && query.trim()) {
+    const res = await pool.query(
+      'SELECT id, username, avatar FROM users WHERE username ILIKE $1 AND ($2::text IS NULL OR id<>$2)',
+      [`%${query}%`, excludeId || null]
+    );
+    return res.rows;
   } else {
-    const stmt = db.prepare('SELECT id, username, avatar FROM users WHERE (? IS NULL OR id <> ?)')
-    return stmt.all(excludeId || null, excludeId || null)
+    const res = await pool.query(
+      'SELECT id, username, avatar FROM users WHERE ($1::text IS NULL OR id<>$1)',
+      [excludeId || null]
+    );
+    return res.rows;
   }
 }
 
-function saveMessage(message) {
-  const stmt = db.prepare(
-    'INSERT INTO messages (id, senderId, receiverId, content, type, timestamp, isRead) VALUES (?, ?, ?, ?, ?, ?, ?)',
-  )
-  const ts = typeof message.timestamp === 'number' ? message.timestamp : new Date(message.timestamp).getTime()
-  stmt.run(
-    message.id,
-    message.senderId,
-    message.receiverId,
-    message.content,
-    message.type,
-    ts,
-    message.isRead ? 1 : 0,
-  )
+// 消息相关
+async function saveMessage(message) {
+  await pool.query(
+    'INSERT INTO messages (id, senderId, receiverId, content, type, timestamp, isRead) VALUES ($1,$2,$3,$4,$5,$6,$7)',
+    [
+      message.id,
+      message.senderId,
+      message.receiverId,
+      message.content,
+      message.type,
+      typeof message.timestamp === 'number'
+        ? message.timestamp
+        : new Date(message.timestamp).getTime(),
+      message.isRead ? true : false,
+    ]
+  );
 }
 
-function getMessagesForUser(userId) {
-  const stmt = db.prepare(
-    'SELECT id, senderId, receiverId, content, type, timestamp, isRead FROM messages WHERE receiverId = ? ORDER BY timestamp ASC',
-  )
-  const rows = stmt.all(userId)
-  return rows.map((r) => ({
-    id: r.id,
-    senderId: r.senderId,
-    receiverId: r.receiverId,
-    content: r.content,
-    type: r.type,
-    timestamp: new Date(r.timestamp),
-    isRead: !!r.isRead,
-  }))
+async function getMessagesForUser(userId) {
+  const res = await pool.query(
+    'SELECT * FROM messages WHERE receiverId=$1 ORDER BY timestamp ASC',
+    [userId]
+  );
+  return res.rows.map(r => ({
+    ...r,
+    timestamp: new Date(Number(r.timestamp)),
+    isRead: r.isread,
+  }));
 }
 
-function getMessagesForConversation(userIdA, userIdB) {
-  const stmt = db.prepare(
-    `SELECT id, senderId, receiverId, content, type, timestamp, isRead
-     FROM messages
-     WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?)
-     ORDER BY timestamp ASC`
-  )
-  const rows = stmt.all(userIdA, userIdB, userIdB, userIdA)
-  return rows.map((r) => ({
-    id: r.id,
-    senderId: r.senderId,
-    receiverId: r.receiverId,
-    content: r.content,
-    type: r.type,
-    timestamp: new Date(r.timestamp),
-    isRead: !!r.isRead,
-  }))
+async function getMessagesForConversation(userIdA, userIdB) {
+  const res = await pool.query(
+    `SELECT * FROM messages 
+     WHERE (senderId=$1 AND receiverId=$2) OR (senderId=$2 AND receiverId=$1)
+     ORDER BY timestamp ASC`,
+    [userIdA, userIdB]
+  );
+  return res.rows.map(r => ({
+    ...r,
+    timestamp: new Date(Number(r.timestamp)),
+    isRead: r.isread,
+  }));
 }
 
-function saveFriendRequest(request) {
-  const stmt = db.prepare(
-    'INSERT OR REPLACE INTO friend_requests (id, fromUserId, toUserId, status, timestamp) VALUES (?, ?, ?, ?, ?)',
-  )
-  const ts = typeof request.timestamp === 'number' ? request.timestamp : new Date(request.timestamp).getTime()
-  stmt.run(request.id, request.fromUserId, request.toUserId, request.status, ts)
+// 好友请求
+async function saveFriendRequest(req) {
+  await pool.query(
+    `INSERT INTO friend_requests (id, fromUserId, toUserId, status, timestamp)
+     VALUES ($1,$2,$3,$4,$5)
+     ON CONFLICT (id) DO UPDATE SET status=$4, timestamp=$5`,
+    [
+      req.id,
+      req.fromUserId,
+      req.toUserId,
+      req.status,
+      typeof req.timestamp === 'number'
+        ? req.timestamp
+        : new Date(req.timestamp).getTime(),
+    ]
+  );
 }
 
-function updateFriendRequestStatus(id, status) {
-  const stmt = db.prepare('UPDATE friend_requests SET status = ? WHERE id = ?')
-  stmt.run(status, id)
+async function updateFriendRequestStatus(id, status) {
+  await pool.query('UPDATE friend_requests SET status=$1 WHERE id=$2', [
+    status,
+    id,
+  ]);
 }
 
-function addFriendship(userId, friendId) {
-  const stmt = db.prepare('INSERT OR IGNORE INTO friends (userId, friendId) VALUES (?, ?)')
-  stmt.run(userId, friendId)
+async function addBidirectionalFriendship(userId, friendId) {
+  await pool.query(
+    'INSERT INTO friends (userId, friendId) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+    [userId, friendId]
+  );
+  await pool.query(
+    'INSERT INTO friends (userId, friendId) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+    [friendId, userId]
+  );
 }
 
-function addBidirectionalFriendship(userId, friendId) {
-  const insert = db.prepare('INSERT OR IGNORE INTO friends (userId, friendId) VALUES (?, ?)')
-  const tx = db.transaction((a, b) => {
-    insert.run(a, b)
-    insert.run(b, a)
-  })
-  tx(userId, friendId)
-}
-
-function getFriendsForUser(userId) {
-  const stmt = db.prepare(
+async function getFriendsForUser(userId) {
+  const res = await pool.query(
     `SELECT u.id, u.username, u.avatar
      FROM friends f
-     JOIN users u ON u.id = f.friendId
-     WHERE f.userId = ?`
-  )
-  return stmt.all(userId)
+     JOIN users u ON u.id=f.friendId
+     WHERE f.userId=$1`,
+    [userId]
+  );
+  return res.rows;
 }
 
-function getPendingFriendRequestsForUser(userId) {
-  const stmt = db.prepare(
-    `SELECT fr.id, fr.fromUserId, fr.toUserId, fr.status, fr.timestamp,
-            fu.username AS fromUsername, fu.avatar AS fromAvatar,
-            tu.username AS toUsername, tu.avatar AS toAvatar
-     FROM friend_requests fr
-     JOIN users fu ON fu.id = fr.fromUserId
-     JOIN users tu ON tu.id = fr.toUserId
-     WHERE fr.toUserId = ? AND fr.status = 'pending'
-     ORDER BY fr.timestamp DESC`
-  )
-  return stmt.all(userId).map((r) => ({
-    id: r.id,
-    fromUser: { id: r.fromUserId, username: r.fromUsername, avatar: r.fromAvatar },
-    toUser: { id: r.toUserId, username: r.toUsername, avatar: r.toAvatar },
-    status: r.status,
-    timestamp: new Date(r.timestamp),
-  }))
-}
-
-function getFriendRequestByIdWithUsers(id) {
-  const stmt = db.prepare(
-    `SELECT fr.id, fr.fromUserId, fr.toUserId, fr.status, fr.timestamp,
-            fu.username AS fromUsername, fu.avatar AS fromAvatar,
-            tu.username AS toUsername, tu.avatar AS toAvatar
-     FROM friend_requests fr
-     JOIN users fu ON fu.id = fr.fromUserId
-     JOIN users tu ON tu.id = fr.toUserId
-     WHERE fr.id = ?`
-  )
-  const r = stmt.get(id)
-  if (!r) return null
-  return {
-    id: r.id,
-    fromUser: { id: r.fromUserId, username: r.fromUsername, avatar: r.fromAvatar },
-    toUser: { id: r.toUserId, username: r.toUsername, avatar: r.toAvatar },
-    status: r.status,
-    timestamp: new Date(r.timestamp),
-  }
+// 获取所有用户
+async function getAllUsers() {
+  const res = await pool.query('SELECT id, username, avatar FROM users');
+  return res.rows;
 }
 
 module.exports = {
@@ -234,12 +223,7 @@ module.exports = {
   getMessagesForConversation,
   saveFriendRequest,
   updateFriendRequestStatus,
-  addFriendship,
   addBidirectionalFriendship,
   getFriendsForUser,
-  getPendingFriendRequestsForUser,
-  getFriendRequestByIdWithUsers,
-  getAllUsers: () => db.prepare('SELECT id, username, avatar FROM users').all(),
-}
-
-
+  getAllUsers,
+};

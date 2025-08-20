@@ -116,7 +116,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { socket } = get()
     if (socket) {
       socket.emit('friend:response', { requestId, status: 'rejected' })
-    }
+    } 
+    else {
+      console.error("⚠️ socket not connected")
+    }//debug,测试Socket连接
   },
 
   // 聊天操作

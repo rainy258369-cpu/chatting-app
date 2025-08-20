@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Box, Paper, Typography, TextField, IconButton, Avatar, Chip, Divider } from '@mui/material'
+import { Box, Paper, Typography, TextField, IconButton, Avatar, Chip} from '@mui/material'
 import { Send, Person } from '@mui/icons-material'
 import { useChatStore } from '../../store/useChatStore'
-import type { User, Message } from '../../types'
+import type { User} from '../../types'
 
 interface ChatWindowProps {
   friend: User

@@ -1,18 +1,11 @@
 import { useState } from 'react'
 import {
   Box,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  ListItemSecondaryAction,
-  Avatar,
+  Paper,
   Typography,
-  Badge,
   IconButton,
+  Avatar,
   Chip,
-  Divider,
-  Button,
 } from '@mui/material'
 import { Person, Check, Close, Circle, Search } from '@mui/icons-material'
 import { useChatStore } from '../../store/useChatStore'
@@ -74,41 +67,52 @@ export default function FriendList({ onSelectFriend }: FriendListProps) {
             <Typography variant="subtitle2" color="primary" gutterBottom>
               好友请求 ({friendRequests.length})
             </Typography>
-            <List dense>
+            <Paper variant="outlined" sx={{ borderRadius: 1 }}>
               {friendRequests.map((request) => (
-                <ListItem key={request.id} sx={{ bgcolor: 'grey.50', mb: 1, borderRadius: 1 }}>
-                  <ListItemAvatar>
-                    <Avatar src={request.fromUser.avatar}>
-                      <Person />
-                    </Avatar>
-                  </ListItemAvatar>
-                  <ListItemText primary={request.fromUser.username} secondary="想添加您为好友" />
-                  <ListItemSecondaryAction>
-                    <IconButton
-                      size="small"
-                      color="primary"
-                      onClick={() => handleAcceptRequest(request.id)}
-                      sx={{ mr: 1 }}
-                    >
-                      <Check />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleRejectRequest(request.id)}
-                    >
-                      <Close />
-                    </IconButton>
-                  </ListItemSecondaryAction>
-                </ListItem>
+                <Box
+                  key={request.id}
+                  sx={{
+                    p: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    borderBottom: '1px solid',
+                    borderColor: 'divider',
+                  }}
+                >
+                  <Avatar src={request.fromUser.avatar} sx={{ mr: 1 }}>
+                    <Person />
+                  </Avatar>
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="body2" fontWeight="medium">
+                      {request.fromUser.username}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      想添加您为好友
+                    </Typography>
+                  </Box>
+                  <IconButton
+                    size="small"
+                    color="primary"
+                    onClick={() => handleAcceptRequest(request.id)}
+                    sx={{ mr: 1 }}
+                  >
+                    <Check />
+                  </IconButton>
+                  <IconButton
+                    size="small"
+                    color="error"
+                    onClick={() => handleRejectRequest(request.id)}
+                  >
+                    <Close />
+                  </IconButton>
+                </Box>
               ))}
-            </List>
-            <Divider sx={{ my: 2 }} />
+            </Paper>
           </Box>
         )}
 
         {/* 好友列表 */}
-        <List>
+        <Box>
           {filteredFriends.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <Typography color="text.secondary">
@@ -117,51 +121,42 @@ export default function FriendList({ onSelectFriend }: FriendListProps) {
             </Box>
           ) : (
             filteredFriends.map((friend) => (
-              <ListItem
+              <Box
                 key={friend.id}
-                button
-                onClick={() => onSelectFriend(friend)}
                 sx={{
-                  mb: 1,
+                  p: 1,
+                  display: 'flex',
+                  alignItems: 'center',
                   borderRadius: 1,
                   '&:hover': { bgcolor: 'action.hover' },
                 }}
+                onClick={() => onSelectFriend(friend)}
               >
-                <ListItemAvatar>
-                  <Badge
-                    overlap="circular"
-                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                    badgeContent={
-                      <Circle
-                        sx={{
-                          color: friend.status === 'online' ? 'success.main' : 'grey.400',
-                          fontSize: 12,
-                        }}
-                      />
-                    }
-                  >
-                    <Avatar src={friend.avatar}>
-                      <Person />
-                    </Avatar>
-                  </Badge>
-                </ListItemAvatar>
-                <ListItemText
-                  primary={friend.username}
-                  secondary={
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Chip
-                        label={friend.status === 'online' ? '在线' : '离线'}
-                        size="small"
-                        color={friend.status === 'online' ? 'success' : 'default'}
-                        variant="outlined"
-                      />
-                    </Box>
-                  }
+                <Avatar src={friend.avatar} sx={{ mr: 2 }}>
+                  <Person />
+                </Avatar>
+                <Box sx={{ flexGrow: 1 }}>
+                  <Typography variant="body2" fontWeight="medium">
+                    {friend.username}
+                  </Typography>
+                  <Chip
+                    label={friend.status === 'online' ? '在线' : '离线'}
+                    size="small"
+                    color={friend.status === 'online' ? 'success' : 'default'}
+                    variant="outlined"
+                    sx={{ mt: 0.5 }}
+                  />
+                </Box>
+                <Circle
+                  sx={{
+                    color: friend.status === 'online' ? 'success.main' : 'grey.400',
+                    fontSize: 12,
+                  }}
                 />
-              </ListItem>
+              </Box>
             ))
           )}
-        </List>
+        </Box>
       </Box>
     </Box>
   )

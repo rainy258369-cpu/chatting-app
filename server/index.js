@@ -128,7 +128,7 @@ io.on('connection', (socket) => {
     if (!requestId || !status) return;
     try {
       await db.updateFriendRequestStatus(requestId, status);
-      const req = await db.getFriendRequestByIdWithUsers(requestId);
+      const req = await db.getFriendRequestsForUser(requestId);//getFriendRequestByIdWithUsers原先的函数名
       if (!req) return;
 
       if (status === 'accepted') {

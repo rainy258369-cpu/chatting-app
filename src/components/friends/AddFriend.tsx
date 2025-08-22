@@ -87,7 +87,7 @@ export default function AddFriend() {
             placeholder="输入用户名搜索..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyPress={handleKeyPress}//怎么回事
+            onKeyPress={handleKeyPress}
             InputProps={{
               startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
             }}

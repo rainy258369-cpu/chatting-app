@@ -12,7 +12,6 @@ import {
   IconButton,
   Chip,
   Divider,
-  Button,
 } from '@mui/material'
 import { Person, Check, Close, Circle, Search } from '@mui/icons-material'
 import { useChatStore } from '../../store/useChatStore'
@@ -119,7 +118,6 @@ export default function FriendList({ onSelectFriend }: FriendListProps) {
             filteredFriends.map((friend) => (
               <ListItem
                 key={friend.id}
-                button
                 onClick={() => onSelectFriend(friend)}
                 sx={{
                   mb: 1,

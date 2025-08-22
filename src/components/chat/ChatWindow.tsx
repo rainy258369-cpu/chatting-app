@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Box, Paper, Typography, TextField, IconButton, Avatar, Chip, Divider } from '@mui/material'
+import { Box, Paper, Typography, TextField, IconButton, Avatar, Chip } from '@mui/material'
 import { Send, Person } from '@mui/icons-material'
 import { useChatStore } from '../../store/useChatStore'
-import type { User, Message } from '../../types'
+import type { User } from '../../types'
 
 interface ChatWindowProps {
   friend: User
@@ -14,10 +14,9 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ friend }) => {
 
   const currentUser = useChatStore((s) => s.currentUser)
   const messages = useChatStore((s) => s.messages)
+  const chatMessages = messages[friend.id] || []
   const sendMessage = useChatStore((s) => s.sendMessage)
   const isConnected = useChatStore((s) => s.isConnected)
-
-  const chatMessages = messages[friend.id] || []
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -39,7 +38,6 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ friend }) => {
     }
     load()
     // 仅在 friend.id 变化时触发
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [friend.id])
 
   const handleSend = () => {

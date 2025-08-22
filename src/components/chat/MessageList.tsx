@@ -1,19 +1,41 @@
-// src/components/chat/MessageList.tsx
 import { useMemo } from 'react'
 import { useChatStore } from '../../store/useChatStore'
 
-export default function MessageList() {
-  const messages = useChatStore((s) => s.messages)
-  const user = useChatStore((s) => s.user)
+type Message = {
+  id: string
+  senderId: string
+  receiverId: string
+  content: string
+  type: 'text' | 'image' | 'file'
+  timestamp: Date
+  isRead: boolean
+}
 
-  const items = useMemo(
+type MessageWithMeta = Message & {
+  isMe: boolean
+  time: string
+}
+
+function formatTime(ts: Date | string | number) {
+  const d = ts instanceof Date ? ts : new Date(ts)
+  return isNaN(d.getTime()) ? '' : d.toLocaleTimeString()
+}
+
+export default function MessageList() {
+  // 直接把“当前会话”的消息取成数组（没有就返回空数组），这样后面一定能 .map
+  const currentMessages = useChatStore((s) =>
+    s.currentChatId ? (s.messages[s.currentChatId] ?? []) : ([] as Message[]),
+  )
+  const currentUserId = useChatStore((s) => s.currentUser?.id ?? null)
+
+  const items = useMemo<MessageWithMeta[]>(
     () =>
-      messages.map((m) => ({
+      currentMessages.map((m) => ({
         ...m,
-        isMe: m.user === user,
-        time: new Date(m.ts).toLocaleTimeString(),
+        isMe: currentUserId !== null && m.senderId === currentUserId,
+        time: formatTime(m.timestamp),
       })),
-    [messages, user],
+    [currentMessages, currentUserId],
   )
 
   return (
@@ -31,10 +53,7 @@ export default function MessageList() {
       {items.map((m) => (
         <div
           key={m.id}
-          style={{
-            display: 'flex',
-            justifyContent: m.isMe ? 'flex-end' : 'flex-start',
-          }}
+          style={{ display: 'flex', justifyContent: m.isMe ? 'flex-end' : 'flex-start' }}
         >
           <div
             style={{
@@ -49,8 +68,10 @@ export default function MessageList() {
             }}
             title={m.time}
           >
-            {!m.isMe && <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>{m.user}</div>}
-            {m.text}
+            {!m.isMe && (
+              <div style={{ fontSize: 12, opacity: 0.7, marginBottom: 4 }}>{m.senderId}</div>
+            )}
+            {m.content}
           </div>
         </div>
       ))}

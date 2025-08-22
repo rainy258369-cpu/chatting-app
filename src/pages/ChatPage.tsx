@@ -1,14 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import {
-  Box,
-  Paper,
-  Typography,
-  Drawer,
-  IconButton,
-  Badge,
-  Chip,
-} from '@mui/material'
+import { Box, Paper, Typography, Drawer, IconButton, Badge, Chip } from '@mui/material'
 import { People, Chat, Menu, Close, Circle } from '@mui/icons-material'
 import { useChatStore } from '../store/useChatStore'
 import FriendList from '../components/friends/FriendList'
@@ -21,8 +13,6 @@ export default function ChatPage() {
   const [selectedFriend, setSelectedFriend] = useState<User | null>(null)
 
   const isAuthenticated = useChatStore((s) => s.isAuthenticated)
-  const currentUser = useChatStore((s) => s.currentUser)
-  const friends = useChatStore((s) => s.friends)
   const friendRequests = useChatStore((s) => s.friendRequests)
   const isConnected = useChatStore((s) => s.isConnected)
   const navigate = useNavigate()
@@ -90,7 +80,12 @@ export default function ChatPage() {
       </Box>
 
       {/* 好友列表抽屉 */}
-      <Drawer anchor="left" open={drawerOpen} onClose={toggleDrawer} sx={{ '& .MuiDrawer-paper': { width: 320, boxSizing: 'border-box' } }}>
+      <Drawer
+        anchor="left"
+        open={drawerOpen}
+        onClose={toggleDrawer}
+        sx={{ '& .MuiDrawer-paper': { width: 320, boxSizing: 'border-box' } }}
+      >
         <Box className="p-2 border-b">
           <Box className="flex items-center justify-between">
             <Typography variant="h6">好友列表</Typography>

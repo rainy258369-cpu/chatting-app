@@ -47,6 +47,7 @@ export default function FriendList({ onSelectFriend }: FriendListProps) {
             <Search sx={{ position: 'absolute', left: 8, top: 8, color: 'text.secondary' }} />
             <input
               type="text"
+              id="friend-search"
               placeholder="搜索好友..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}

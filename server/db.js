@@ -184,6 +184,24 @@ async function getFriendRequestsForUser(userId) {
   }));
 }
 
+async function getFriendRequestById(requestId) {
+  const res = await pool.query(
+    `SELECT id, fromUserId, toUserId, status, timestamp
+     FROM friend_requests 
+     WHERE id=$1`,
+    [requestId]
+  );
+  if (res.rows.length === 0) return null;
+  const r = res.rows[0];
+  return {
+    id: r.id,
+    fromUserId: r.fromuserid,
+    toUserId: r.touserid,
+    status: r.status,
+    timestamp: new Date(Number(r.timestamp))
+  };
+}
+
 
 async function saveFriendRequest(req) {
   await pool.query(
@@ -250,5 +268,6 @@ module.exports = {
   addBidirectionalFriendship,
   getFriendsForUser,
   getAllUsers,
-  getFriendRequestsForUser 
+  getFriendRequestsForUser,
+  getFriendRequestById
 };

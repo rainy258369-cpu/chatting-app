@@ -128,22 +128,36 @@ io.on('connection', (socket) => {
     if (!requestId || !status) return;
     try {
       await db.updateFriendRequestStatus(requestId, status);
-      const req = await db.getFriendRequestsForUser(requestId);//getFriendRequestByIdWithUsers原先的函数名
-      if (!req) return;
+      // 修复：首先获取请求信息，然后传入正确的用户ID
+      // 原代码: const req = await db.getFriendRequestsForUser(requestId);
+      // 修改为:
+      const requestInfo = await db.getFriendRequestById(requestId);
+      if (!requestInfo) return;
 
       if (status === 'accepted') {
-        await db.addBidirectionalFriendship(req.fromUser.id, req.toUser.id);
+        await db.addBidirectionalFriendship(requestInfo.fromUserId, requestInfo.toUserId);
       }
 
+      // 重新构建payload
+      const fromUser = await db.getUserById(requestInfo.fromUserId);
+      const toUser = await db.getUserById(requestInfo.toUserId);
+      
       const payload = {
-        ...req,
+        id: requestId,
         status,
-        fromUser: { ...req.fromUser, status: onlineUsers.has(req.fromUser.id) ? 'online' : 'offline' },
-        toUser: { ...req.toUser, status: onlineUsers.has(req.toUser.id) ? 'online' : 'offline' },
+        timestamp: requestInfo.timestamp,
+        fromUser: { 
+          ...fromUser, 
+          status: onlineUsers.has(fromUser.id) ? 'online' : 'offline' 
+        },
+        toUser: { 
+          ...toUser, 
+          status: onlineUsers.has(toUser.id) ? 'online' : 'offline' 
+        },
       };
 
-      const fromUserOnline = onlineUsers.get(req.fromUser.id);
-      const toUserOnline = onlineUsers.get(req.toUser.id);
+      const fromUserOnline = onlineUsers.get(requestInfo.fromUserId);
+      const toUserOnline = onlineUsers.get(requestInfo.toUserId);
       if (fromUserOnline) io.to(fromUserOnline.socketId).emit('friend:response', payload);
       if (toUserOnline) io.to(toUserOnline.socketId).emit('friend:response', payload);
     } catch (e) {

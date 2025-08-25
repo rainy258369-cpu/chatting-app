@@ -14,7 +14,7 @@ const ChatWindow: React.FC<ChatWindowProps> = ({ friend }) => {
 
   const currentUser = useChatStore((s) => s.currentUser)
   const messages = useChatStore((s) => s.messages)
-  const chatMessages = messages[friend.id] || []
+  const chatMessages = React.useMemo(() => messages[friend.id] || [], [messages, friend.id])
   const sendMessage = useChatStore((s) => s.sendMessage)
   const isConnected = useChatStore((s) => s.isConnected)
 

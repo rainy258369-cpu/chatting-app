@@ -116,7 +116,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { socket } = get()
     if (socket) {
       socket.emit('friend:response', { requestId, status: 'rejected' })
-    }
+    } else {
+      console.error('⚠️ socket not connected')
+    } //debug,测试Socket连接
   },
 
   // 聊天操作
@@ -174,7 +176,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const { currentUser } = get()
     if (!currentUser) return
 
-    const socket = io('http://localhost:3001', {
+    const socket = io('https://chatting-app-cy6c.onrender.com', {
       auth: {
         userId: currentUser.id,
         username: currentUser.username,
